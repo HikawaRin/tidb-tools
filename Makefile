@@ -10,14 +10,24 @@ CURDIR := $(shell pwd)
 path_to_add := $(addsuffix /bin,$(subst :,/bin:,$(GOPATH)))
 export PATH := $(path_to_add):$(PATH)
 
+DATE_FMT = +%Y-%m-%d %I:%M:%S
+ifdef SOURCE_DATE_EPOCH
+	BUILD_DATE ?= $(shell \
+				  date -u -d "@$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null \
+				|| date -u -r "$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null \
+				|| date -u "$(DATE_FMT)")
+else 
+	BUILD_DATE ?= $(shell date "$(DATE_FMT)")
+endif
 
 LDFLAGS += -X "github.com/pingcap/tidb-tools/pkg/utils.Version=$(shell git describe --tags --dirty --always)"
-LDFLAGS += -X "github.com/pingcap/tidb-tools/pkg/utils.BuildTS=$(shell date -u '+%Y-%m-%d %I:%M:%S')"
+LDFLAGS += -X "github.com/pingcap/tidb-tools/pkg/utils.BuildTS=$(BUILD_DATE)"
 LDFLAGS += -X "github.com/pingcap/tidb-tools/pkg/utils.GitHash=$(shell git rev-parse HEAD)"
 LDFLAGS += -X "github.com/pingcap/tidb-tools/pkg/utils.GitBranch=$(shell git rev-parse --abbrev-ref HEAD)"
 
 CURDIR   := $(shell pwd)
 GO       := GO111MODULE=on go
+GOBUILD  := $(GO) build -trimpath -ldflags '$(LDFLAGS)' 	
 GOTEST   := CGO_ENABLED=1 $(GO) test -p 3
 PACKAGES := $$(go list ./... | grep -vE 'vendor')
 FILES     := $$(find . -name '*.go' -type f | grep -vE 'vendor')
@@ -56,16 +66,16 @@ prepare:
 	cp go.sum1 go.sum
 
 importer:
-	$(GO) build -ldflags '$(LDFLAGS)' -o bin/importer ./importer
+	$(GOBUILD) -o bin/importer ./importer
 
 dump_region:
-	$(GO) build -ldflags '$(LDFLAGS)' -o bin/dump_region ./dump_region
+	$(GOBUILD) -o bin/dump_region ./dump_region
 
 sync_diff_inspector:
-	$(GO) build -ldflags '$(LDFLAGS)' -o bin/sync_diff_inspector ./sync_diff_inspector
+	$(GOBUILD) -o bin/sync_diff_inspector ./sync_diff_inspector
 
 ddl_checker:
-	$(GO) build -ldflags '$(LDFLAGS)' -o bin/ddl_checker ./ddl_checker
+	$(GOBUILD) -o bin/ddl_checker ./ddl_checker
 
 test: version
 	rm -rf /tmp/output
